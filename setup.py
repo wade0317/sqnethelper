@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='sqnethelper',
-    version='0.2.9',
+    version='0.3.0',
     packages=find_packages(),
     package_data={
         'sqnethelper': ['sing-box_template.json'],

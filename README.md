@@ -211,6 +211,9 @@ rm -rf build/ dist/ sqnethelper.egg-info/
 
 #### 3. 构建包
 
+
+source venv/bin/activate && pip install --upgrade pip build twine wheel
+
 ```bash
 # 使用build模块构建
 python -m build
