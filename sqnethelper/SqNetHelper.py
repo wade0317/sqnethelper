@@ -2,6 +2,7 @@ import time
 import os
 from pathlib import Path
 from datetime import datetime, timedelta
+import click
 from sqnethelper.ECSManager import ECSManager
 from sqnethelper.VPCManager import VPCManager
 from sqnethelper.ConfigManager import ConfigManager
@@ -59,16 +60,136 @@ class SqNetHelper:
         SQLOG.info(f"地区: {config.region}")
         SQLOG.info(f"可用区: {zone_id}")
 
+        # 让用户输入vCPU和内存大小
+        SQLOG.info("\n配置实例规格参数")
+
+        # 获取vCPU数量
+        cpu_count = click.prompt(
+            "请输入vCPU核数",
+            type=click.IntRange(1, 128),
+            default=config.instance_cpu_count,
+            show_default=True
+        )
+
+        # 获取内存大小
+        memory_size = click.prompt(
+            "请输入内存大小(GB)",
+            type=click.FloatRange(0.5, 1024.0),
+            default=config.instance_memory_size,
+            show_default=True
+        )
+
+        SQLOG.info(f"\n已选择: {cpu_count}核CPU, {memory_size}GB内存")
+
+        # 让用户输入实例名称前缀
+        instance_name = click.prompt(
+            "\n请输入实例名称前缀",
+            type=str,
+            default="sqnetecs-",
+            show_default=True
+        )
+        # 确保以-结尾
+        if not instance_name.endswith('-'):
+            instance_name += '-'
+
+        # 让用户输入安全组名称前缀
+        security_group_name = click.prompt(
+            "请输入安全组名称前缀",
+            type=str,
+            default="sqgroup-",
+            show_default=True
+        )
+        # 确保以-结尾
+        if not security_group_name.endswith('-'):
+            security_group_name += '-'
+
+        # 保存用户选择的配置
+        config.set_config(
+            instance_cpu_count=cpu_count,
+            instance_memory_size=memory_size,
+            instance_name=instance_name,
+            security_group_name=security_group_name
+        )
+
         vpcmanager = VPCManager(config.access_key, config.access_secret, config.region)
 
-        instance_type_info = vpcmanager.get_available_instance_types_with_price(zone_id=zone_id, cpu_count = config.instance_cpu_count, memory_size = config.instance_memory_size)
-        if len(instance_type_info) >0   :
-            instance_type = instance_type_info[0][0]
+        # 获取可用的实例规格
+        SQLOG.info(f"开始获取实例规格，CPU数量: {cpu_count}, 内存大小: {memory_size}")
+        instance_type_info = vpcmanager.get_available_instance_types_with_price(zone_id=zone_id, cpu_count=cpu_count, memory_size=memory_size)
+        SQLOG.info(f"获取到的实例规格数量: {len(instance_type_info)}")
+
+        if len(instance_type_info) > 0:
+            # 总是显示所有可用规格，让用户选择
+            SQLOG.info(f"\n可用的实例规格:")
+            for idx, (instance_type, price) in enumerate(instance_type_info, 1):
+                # 解析实例规格名称以获取CPU和内存信息
+                parts = instance_type.split('.')
+                if len(parts) >= 3:
+                    spec_info = parts[2]  # 例如: c4m1
+                    # 尝试解析CPU和内存
+                    import re
+                    match = re.match(r'c(\d+)m(\d+)', spec_info)
+                    if match:
+                        cpu_count = match.group(1)
+                        memory_gb = match.group(2)
+                        SQLOG.info(f"{idx}. {instance_type} ({cpu_count}核CPU, {memory_gb}GB内存) - 价格: {price}")
+                    else:
+                        SQLOG.info(f"{idx}. {instance_type} - 价格: {price}")
+                else:
+                    SQLOG.info(f"{idx}. {instance_type} - 价格: {price}")
+
+            # 获取用户选择
+            if len(instance_type_info) == 1:
+                SQLOG.info(f"只有一个实例规格可用，是否使用？")
+                if click.confirm(f"使用 {instance_type_info[0][0]}?", default=True):
+                    instance_type = instance_type_info[0][0]
+                    SQLOG.info(f"已选择实例规格: {instance_type}")
+                else:
+                    SQLOG.error("用户取消选择")
+                    return False
+            else:
+                choice = click.prompt(f"请选择实例规格序号", type=click.IntRange(1, len(instance_type_info)))
+                instance_type = instance_type_info[choice - 1][0]
+                SQLOG.info(f"已选择实例规格: {instance_type}")
+            
             config.set_config(
                 instance_type=instance_type
             )
+        else:
+            SQLOG.warning(f"当前区域没有可用的实例规格，使用默认值: {config.instance_type}")
 
         SQLOG.info(f"创建虚拟机实例规格为: {config.instance_type}")
+        
+        # 获取并选择系统镜像
+        SQLOG.info("\n获取可用的系统镜像...")
+        images = ecs_manager.get_public_images()
+        SQLOG.info(f"获取到的系统镜像数量: {len(images) if images else 0}")
+
+        if images:
+            # 总是显示所有可用镜像，让用户选择
+            SQLOG.info(f"\n可用的系统镜像:")
+            for idx, (image_id, image_name, os_name, version) in enumerate(images, 1):
+                SQLOG.info(f"{idx}. {image_name} (ID: {image_id})")
+
+            # 获取用户选择
+            if len(images) == 1:
+                SQLOG.info(f"只有一个系统镜像可用，是否使用？")
+                if click.confirm(f"使用 {images[0][1]}?", default=True):
+                    image_id = images[0][0]
+                    SQLOG.info(f"已选择系统镜像: {images[0][1]}")
+                else:
+                    SQLOG.error("用户取消选择")
+                    return False
+            else:
+                choice = click.prompt(f"请选择系统镜像序号", type=click.IntRange(1, len(images)))
+                image_id = images[choice - 1][0]
+                SQLOG.info(f"已选择系统镜像: {images[choice - 1][1]}")
+            
+            config.set_config(image_id=image_id)
+        else:
+            SQLOG.warning(f"无法获取系统镜像列表，使用默认镜像: {config.image_id}")
+            
+        SQLOG.info(f"系统镜像ID: {config.image_id}")
 
         disks_resources = vpcmanager.get_available_disk_categories(zone_id=zone_id, insance_type=config.instance_type)
         disk_types = ["cloud_efficiency", "cloud_essd_entry", "cloud_ssd", "cloud_essd"]
@@ -145,7 +266,20 @@ class SqNetHelper:
         else:
             vpc_id = vpcmanager.is_vpc_exist_with_name(config.vpc_name)
             if not vpc_id:
-                vpc_id = vpcmanager.create_vpc()
+                try:
+                    vpc_id = vpcmanager.create_vpc()
+                except Exception as e:
+                    if "Forbidden.RAM" in str(e) or "not authorized" in str(e):
+                        SQLOG.error("\n❌ VPC创建权限不足")
+                        SQLOG.error("解决方案：")
+                        SQLOG.error("1. 如果使用RAM子账号，请添加以下权限：")
+                        SQLOG.error("   - AliyunVPCFullAccess (VPC完全访问权限)")
+                        SQLOG.error("   - AliyunECSFullAccess (ECS完全访问权限)")
+                        SQLOG.error("2. 或者在阿里云控制台手动创建VPC和安全组")
+                        SQLOG.error("3. 然后重新运行本工具，它会自动使用已存在的资源")
+                    else:
+                        SQLOG.error(f"创建VPC失败: {str(e)}")
+                    return False
             if not vpc_id:
                 SQLOG.info("创建专有网络失败！")
                 return False
@@ -161,7 +295,7 @@ class SqNetHelper:
                 return False  
 
             SQLOG.info("创建虚拟交换机成功: ", vswitch_id)  
-            security_group_id = vpcmanager.create_security_group(vpc_id)
+            security_group_id = vpcmanager.create_security_group(vpc_id, config.security_group_name)
             if not security_group_id:
                 SQLOG.info("创建安全组失败！")
                 return False

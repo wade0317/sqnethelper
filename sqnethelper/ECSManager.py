@@ -68,6 +68,114 @@ class ECSManager:
         except Exception as e:
             SQLOG.info(f"get_zones: {str(e)}")
             return None
+    
+    def get_public_images(self):
+        """
+        获取当前区域的公共镜像，返回Ubuntu和Debian的最新版本
+        """
+        SQLOG.info(f"[ECSManager] 开始获取公共镜像")
+        try:
+            request = DescribeImagesRequest()
+            request.set_ImageOwnerAlias('system')  # 公共镜像
+            request.set_OSType('linux')            # Linux系统
+            request.set_Architecture('x86_64')     # 64位架构
+            request.set_PageSize(100)              # 获取足够多的镜像
+            request.set_Status('Available')        # 只获取可用镜像
+            
+            response = self.client.do_action_with_exception(request)
+            images = json.loads(response)['Images']['Image']
+            
+            # 过滤Ubuntu和Debian镜像
+            ubuntu_images = []
+            debian_images = []
+            
+            for image in images:
+                image_id = image.get('ImageId', '')
+                image_name = image.get('ImageName', '')
+                os_name = image.get('OSName', '')
+                creation_time = image.get('CreationTime', '')
+                
+                # 通过ImageId或OSName判断系统类型
+                if 'ubuntu' in image_id.lower() or 'ubuntu' in os_name.lower():
+                    # 提取版本号
+                    import re
+                    version_match = re.search(r'(\d+)[._](\d+)', image_id)
+                    if version_match:
+                        version = f"{version_match.group(1)}.{version_match.group(2)}"
+                    else:
+                        version = 'unknown'
+                    
+                    ubuntu_images.append({
+                        'id': image_id,
+                        'name': os_name if os_name else image_name,
+                        'os': 'Ubuntu',
+                        'version': version,
+                        'creation_time': creation_time
+                    })
+                    
+                elif 'debian' in image_id.lower() or 'debian' in os_name.lower():
+                    # 提取版本号
+                    import re
+                    version_match = re.search(r'(\d+)[._](\d+)', image_id)
+                    if version_match:
+                        version = f"{version_match.group(1)}.{version_match.group(2)}"
+                    else:
+                        version = 'unknown'
+                    
+                    debian_images.append({
+                        'id': image_id,
+                        'name': os_name if os_name else image_name,
+                        'os': 'Debian',
+                        'version': version,
+                        'creation_time': creation_time
+                    })
+            
+            # 按创建时间排序，取最新的2个版本
+            ubuntu_images.sort(key=lambda x: x['creation_time'], reverse=True)
+            debian_images.sort(key=lambda x: x['creation_time'], reverse=True)
+
+            SQLOG.info(f"[ECSManager] 找到 Ubuntu 镜像: {len(ubuntu_images)} 个, Debian 镜像: {len(debian_images)} 个")
+
+            # 组合结果，每个系统取最新的2个
+            result = []
+            
+            # 添加Ubuntu镜像（最多2个）
+            for img in ubuntu_images[:2]:
+                result.append((
+                    img['id'],
+                    f"{img['os']} {img['version']} 64位",
+                    img['os'],
+                    img['version']
+                ))
+            
+            # 添加Debian镜像（最多2个）
+            for img in debian_images[:2]:
+                result.append((
+                    img['id'],
+                    f"{img['os']} {img['version']} 64位",
+                    img['os'],
+                    img['version']
+                ))
+            
+            # 如果没有找到Ubuntu或Debian，返回一些其他常用镜像
+            if not result:
+                for image in images[:4]:  # 取前4个可用镜像
+                    image_id = image.get('ImageId', '')
+                    os_name = image.get('OSName', '')
+                    if image_id and os_name:
+                        result.append((
+                            image_id,
+                            os_name,
+                            'Other',
+                            'unknown'
+                        ))
+            
+            SQLOG.info(f"[ECSManager] 返回 {len(result)} 个镜像")
+            return result
+
+        except Exception as e:
+            SQLOG.error(f"获取公共镜像失败: {str(e)}")
+            return []
 
     def check_auto_release_time_ready(self, instance_id):
         detail = self.describe_instance_detail(instance_id=instance_id)

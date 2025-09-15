@@ -49,8 +49,8 @@ class VPCManager:
         request.set_DestinationResource("InstanceType")
         # request.set_IoOptimized("optimized")
         request.set_ZoneId(zone_id)
-        # request.set_Cores(cpu_count)
-        request.set_Memory(memory_size)
+        request.set_Cores(cpu_count)  # 设置CPU核数筛选
+        request.set_Memory(memory_size)  # 设置内存大小筛选
         
 
         # 发送请求
@@ -77,12 +77,10 @@ class VPCManager:
             price_request.set_ResourceType("instance")
             price_request.set_InstanceType(instance_type)
             price_request.set_InstanceNetworkType("vpc")
-            price_request.set_PriceUnit("Month")
+            price_request.set_PriceUnit("Month")  # 月价格
             price_request.set_Amount(1)
             price_request.set_ZoneId(zone_id)
-            # price_request.set_Platform("Linux")
-            # price_request.set_OfferingType("AllUpfront")
-            # price_request.set_Scope("OnDemand")
+            # 不设置系统盘参数，只查询纯实例价格
             
                 
             try:
@@ -94,7 +92,8 @@ class VPCManager:
             except Exception as e:
                 SQLOG.debug(f"获取实例类型价格失败: {str(instance_type)}")
                 SQLOG.debug(f"失败原因: {str(e)}")
-                instance_types_price.append((instance_type, 10000.0))
+                # 如果查询失败，使用默认价格0表示价格未知
+                instance_types_price.append((instance_type, 0.0))
                 continue
             
             
@@ -233,14 +232,24 @@ class VPCManager:
 
     def create_vpc(self):
         SQLOG.info("create_vpc")
-        vpc_request = CreateVpcRequest()
-        time_str = time.strftime('%m%d-%H-%M-%S', time.localtime())
-        vpc_name = f"sqvpc-{time_str}"
-        vpc_request.set_CidrBlock(self.vpc_cidr_block)
-        vpc_request.set_VpcName(vpc_name)
-        vpc_response = self.client.do_action_with_exception(vpc_request)
-        vpc_id = json.loads(vpc_response)['VpcId']
-        return vpc_id
+        try:
+            vpc_request = CreateVpcRequest()
+            time_str = time.strftime('%m%d-%H-%M-%S', time.localtime())
+            vpc_name = f"sqvpc-{time_str}"
+            vpc_request.set_CidrBlock(self.vpc_cidr_block)
+            vpc_request.set_VpcName(vpc_name)
+            vpc_response = self.client.do_action_with_exception(vpc_request)
+            vpc_id = json.loads(vpc_response)['VpcId']
+            return vpc_id
+        except Exception as e:
+            if "Forbidden.RAM" in str(e) or "not authorized" in str(e):
+                SQLOG.error("❌ 权限不足：当前账号没有创建VPC的权限")
+                SQLOG.error("请检查：")
+                SQLOG.error("1. 如果使用RAM子账号，请添加AliyunVPCFullAccess权限")
+                SQLOG.error("2. 如果使用主账号，请确保账号状态正常")
+            else:
+                SQLOG.error(f"创建VPC失败: {str(e)}")
+            raise
 
     def is_vpc_exist_with_name(self, vpc_name):
         request = DescribeVpcsRequest()
@@ -389,9 +398,9 @@ class VPCManager:
             SQLOG.info(f"获取安全组列表时发生错误: {str(e)}")
             return None
 
-    def create_security_group(self, vpc_id):
+    def create_security_group(self, vpc_id, security_group_prefix="sqgroup-"):
         time_str = time.strftime('%m%d-%H-%M-%S', time.localtime())
-        security_group_name = f"sqgroup-{time_str}"
+        security_group_name = f"{security_group_prefix}{time_str}"
         security_group_request = CreateSecurityGroupRequest()
         security_group_request.set_SecurityGroupName(security_group_name)
         security_group_request.set_VpcId(vpc_id)
