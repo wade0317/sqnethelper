@@ -271,23 +271,30 @@ def autodel(verbose):
             return False
         else:
             instance_id = instance_array[choice - 1]['InstanceId']
-            SQLOG.great(f"请输入自动删除的时间间隔(分钟),大于 5分钟:")
+            SQLOG.great(f"请输入自动删除的时间间隔(分钟),输入0取消自动释放,大于5分钟设置自动释放:")
             time_min_delay = click.prompt("", type=int)
-            
-            if time_min_delay < 5:
-                SQLOG.error("错误: 时间间隔必须大于5分钟!")
+
+            if time_min_delay != 0 and time_min_delay < 5:
+                SQLOG.error("错误: 时间间隔必须为0(取消)或大于5分钟!")
                 return False
                 
             result = SqNetHelper.modify_auto_release_time(config, instance_id, time_min_delay)
             if result:
-                from datetime import datetime, timedelta
-                local_release_time = (datetime.now() + timedelta(minutes=time_min_delay)).strftime('%Y-%m-%d %H:%M:%S')
-                SQLOG.great(f"✅ 设置成功！")
-                SQLOG.great(f"远程虚拟机 {instance_id} 将在 {time_min_delay} 分钟后自动释放")
-                SQLOG.great(f"预计释放时间(本地时间): {local_release_time}")
+                if time_min_delay == 0:
+                    SQLOG.great(f"✅ 已成功取消自动释放！")
+                    SQLOG.great(f"远程虚拟机 {instance_id} 的自动释放已被取消")
+                else:
+                    from datetime import datetime, timedelta
+                    local_release_time = (datetime.now() + timedelta(minutes=time_min_delay)).strftime('%Y-%m-%d %H:%M:%S')
+                    SQLOG.great(f"✅ 设置成功！")
+                    SQLOG.great(f"远程虚拟机 {instance_id} 将在 {time_min_delay} 分钟后自动释放")
+                    SQLOG.great(f"预计释放时间(本地时间): {local_release_time}")
                 SQLOG.info("请运行 'sqnethelper list' 查看更新后的释放时间")
             else:
-                SQLOG.error(f"❌ 远程虚拟机{instance_id}设置自动释放时间失败!")
+                if time_min_delay == 0:
+                    SQLOG.error(f"❌ 远程虚拟机{instance_id}取消自动释放失败!")
+                else:
+                    SQLOG.error(f"❌ 远程虚拟机{instance_id}设置自动释放时间失败!")
             
             
 @cli.command()

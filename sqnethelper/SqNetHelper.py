@@ -371,13 +371,19 @@ class SqNetHelper:
     
     @staticmethod
     def modify_auto_release_time(config, instance_id, time_min_delay):
-        # 计算UTC时间：当前UTC时间 + 指定分钟数
-        from datetime import datetime, timedelta, timezone
-        utc_now = datetime.now(timezone.utc)
-        auto_release_time = (utc_now + timedelta(minutes=time_min_delay)).strftime('%Y-%m-%dT%H:%M:%SZ')
-        SQLOG.info(f"设置自动释放时间(UTC): {auto_release_time}")
         ecs_manager = ECSManager(config.access_key, config.access_secret, config.region)
-        return ecs_manager.modify_instance_auto_release_time(instance_id, auto_release_time)
+
+        if time_min_delay == 0:
+            # 取消自动释放，传递空字符串给API
+            SQLOG.info(f"取消自动释放时间")
+            return ecs_manager.modify_instance_auto_release_time(instance_id, "")
+        else:
+            # 计算UTC时间：当前UTC时间 + 指定分钟数
+            from datetime import datetime, timedelta, timezone
+            utc_now = datetime.now(timezone.utc)
+            auto_release_time = (utc_now + timedelta(minutes=time_min_delay)).strftime('%Y-%m-%dT%H:%M:%SZ')
+            SQLOG.info(f"设置自动释放时间(UTC): {auto_release_time}")
+            return ecs_manager.modify_instance_auto_release_time(instance_id, auto_release_time)
         
     
 

@@ -31,6 +31,9 @@ class ECSManager:
 
     def __init__(self, access_key, access_secret, region):
         self.client = AcsClient(access_key, access_secret, region)
+        # 设置更长的超时时间
+        self.client._connect_timeout = 30  # 连接超时30秒
+        self.client._read_timeout = 30     # 读取超时30秒
 
     def get_regions(self):
         import time
@@ -184,17 +187,43 @@ class ECSManager:
             return release_time
 
     def modify_instance_auto_release_time(self, instance_id, time_to_release):
-        try:
-            request = ModifyInstanceAutoReleaseTimeRequest()
-            request.set_InstanceId(instance_id)
-            if time_to_release is not None:
-                request.set_AutoReleaseTime(time_to_release)
-            self.client.do_action_with_exception(request)
-            release_time = self.check_auto_release_time_ready(instance_id)
-            return release_time
-        except Exception as e:
-            SQLOG.error(f"设置自动消耗时间失败: {str(e)}")
-            return None
+        import time
+        max_retries = 3
+        retry_delay = 5
+
+        for attempt in range(max_retries):
+            try:
+                request = ModifyInstanceAutoReleaseTimeRequest()
+                request.set_InstanceId(instance_id)
+
+                # 如果time_to_release为空字符串，表示取消自动释放
+                # 如果不为空，则设置自动释放时间
+                if time_to_release != "":
+                    request.set_AutoReleaseTime(time_to_release)
+                # 空字符串时不设置AutoReleaseTime参数，API会取消自动释放
+
+                self.client.do_action_with_exception(request)
+                release_time = self.check_auto_release_time_ready(instance_id)
+
+                if time_to_release == "":
+                    SQLOG.info(f"✅ 成功取消自动释放时间")
+                    return True  # 取消成功返回True
+                elif release_time:
+                    SQLOG.info(f"✅ 成功设置自动释放时间")
+                    return release_time
+                else:
+                    return release_time
+
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    action = "取消" if time_to_release == "" else "设置"
+                    SQLOG.info(f"{action}自动释放时间失败 (尝试 {attempt + 1}/{max_retries}): {str(e)}")
+                    SQLOG.info(f"等待 {retry_delay} 秒后重试...")
+                    time.sleep(retry_delay)
+                else:
+                    action = "取消" if time_to_release == "" else "设置"
+                    SQLOG.error(f"{action}自动释放时间失败: {str(e)}")
+                    return None
         
     def list_instances(self):
         try:
