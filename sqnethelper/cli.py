@@ -225,8 +225,8 @@ def create(verbose):
         # SqNetHelper.install_xray_protocol(config, instance_id, 'reality', 5432)
         # port = click.prompt(f"请输入端口号 (默认: {config.xray_tcp_port})", type=int, default=config.xray_tcp_port)
         # SQLOG.info(f"🔧 正在安装 Xray TCP协议，端口: {port}...")
-        port=config.xray_tcp_port
-        SqNetHelper.install_xray_protocol(config, instance_id, 'tcp', port)
+        # port=config.xray_tcp_port
+        # SqNetHelper.install_xray_protocol(config, instance_id, 'tcp', port)
         
         # SqNetHelper.install_singbox_protocol(config, instance_id, 'ss', 80)
     else:
