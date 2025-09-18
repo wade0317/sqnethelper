@@ -31,9 +31,16 @@ class ECSManager:
 
     def __init__(self, access_key, access_secret, region):
         self.client = AcsClient(access_key, access_secret, region)
-        # 设置更长的超时时间
-        self.client._connect_timeout = 30  # 连接超时30秒
-        self.client._read_timeout = 30     # 读取超时30秒
+        # 设置更长的超时时间（使用私有属性）
+        try:
+            # 尝试设置超时时间
+            if hasattr(self.client, '_connect_timeout'):
+                self.client._connect_timeout = 30  # 连接超时30秒
+            if hasattr(self.client, '_read_timeout'):
+                self.client._read_timeout = 30     # 读取超时30秒
+        except:
+            # 如果设置失败，继续运行
+            pass
 
     def get_regions(self):
         import time

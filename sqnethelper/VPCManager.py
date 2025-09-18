@@ -140,24 +140,50 @@ class VPCManager:
     def get_available_disk_categories(self, zone_id, insance_type):
         # 创建请求对象
         request = DescribeAvailableResourceRequest()
-        
+
         # 设置请求参数
         request.set_DestinationResource("SystemDisk")
         request.set_ResourceType("instance")
         request.set_ZoneId(zone_id)
         request.set_InstanceType(insance_type)
-        
+
         # 发送请求
-        response = self.client.do_action_with_exception(request)
-        resources = json.loads(response)
-        # 解析实例类型
-        disk_types = []
-        for resource in resources['AvailableZones']['AvailableZone'][0]['AvailableResources']['AvailableResource']:
-            for disk_category in resource['SupportedResources']['SupportedResource']:
-                disk_types.append(disk_category)
-        
-        
-        return disk_types
+        try:
+            response = self.client.do_action_with_exception(request)
+            resources = json.loads(response)
+            # 解析实例类型
+            disk_types = []
+
+            # 安全地访问嵌套的字典结构
+            if 'AvailableZones' in resources and 'AvailableZone' in resources['AvailableZones']:
+                zones = resources['AvailableZones']['AvailableZone']
+                if zones and len(zones) > 0:
+                    zone = zones[0]
+                    if 'AvailableResources' in zone and 'AvailableResource' in zone['AvailableResources']:
+                        for resource in zone['AvailableResources']['AvailableResource']:
+                            if 'SupportedResources' in resource and 'SupportedResource' in resource['SupportedResources']:
+                                for disk_category in resource['SupportedResources']['SupportedResource']:
+                                    disk_types.append(disk_category)
+
+            # 如果没有找到任何磁盘类型，返回默认值
+            if not disk_types:
+                SQLOG.warning(f"无法获取可用磁盘类型，使用默认配置")
+                # 返回常见的磁盘类型作为默认值
+                disk_types = [
+                    {'Value': 'cloud_efficiency', 'Status': 'Available'},
+                    {'Value': 'cloud_ssd', 'Status': 'Available'},
+                    {'Value': 'cloud_essd', 'Status': 'Available'}
+                ]
+
+            return disk_types
+        except Exception as e:
+            SQLOG.warning(f"获取磁盘类型失败: {e}，使用默认配置")
+            # 返回默认的磁盘类型
+            return [
+                {'Value': 'cloud_efficiency', 'Status': 'Available'},
+                {'Value': 'cloud_ssd', 'Status': 'Available'},
+                {'Value': 'cloud_essd', 'Status': 'Available'}
+            ]
         
     def import_ssh_key(self, key_pair_name, public_key_body):
         request = ImportKeyPairRequest()

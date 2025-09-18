@@ -192,19 +192,34 @@ class SqNetHelper:
         SQLOG.info(f"系统镜像ID: {config.image_id}")
 
         disks_resources = vpcmanager.get_available_disk_categories(zone_id=zone_id, insance_type=config.instance_type)
-        disk_types = ["cloud_efficiency", "cloud_essd_entry", "cloud_ssd", "cloud_essd"]
-        disk_sure = False
-        for disk_type in disk_types:
+
+        # 按优先级顺序选择磁盘类型：cloud_efficiency > cloud_essd_entry > cloud_essd
+        disk_priority = ["cloud_efficiency", "cloud_essd_entry", "cloud_essd"]
+        disk_selected = False
+
+        for disk_type in disk_priority:
             for item in disks_resources:
-                if item["Value"] == disk_type and item["Status"] == "Available":
-                    disk_sure = True
+                if item.get("Value") == disk_type and item.get("Status") == "Available":
+                    disk_selected = True
+                    # 安全地获取 Min 值，如果不存在则使用默认值 20
+                    min_size = item.get("Min", 20)
                     config.set_config(
                         instance_disk_category=item["Value"],
-                        instance_disk_size= max(item["Min"],20)
+                        instance_disk_size=max(min_size, 20)
                     )
+                    SQLOG.info(f"选择磁盘类型: {disk_type}")
                     break  # 找到符合条件的就退出内层循环
-            if disk_sure:  # 如果已经设置了磁盘类型，就退出外层循环
+            if disk_selected:  # 如果已经设置了磁盘类型，就退出外层循环
                 break
+
+        # 如果没有找到任何可用的磁盘类型，使用默认值
+        if not disk_selected:
+            SQLOG.warning("未找到可用的磁盘类型，使用默认配置: cloud_efficiency")
+            config.set_config(
+                instance_disk_category="cloud_efficiency",
+                instance_disk_size=20
+            )
+
         SQLOG.info(f"创建虚拟机磁盘类型为: {config.instance_disk_category}, 磁盘大小为: {config.instance_disk_size}")
        
         security_group_id = None
