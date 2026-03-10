@@ -406,7 +406,7 @@ class SqNetHelper:
     def install_vpn_unified(config, instance_id):
         SQLOG.info(f"正在安装 VPN...")
         ecs_manager = ECSManager(config.access_key, config.access_secret, config.region)
-        shell_script = "bash <(wget -qO- https://raw.githubusercontent.com/wade0317/Xray/main/install.sh)"
+        shell_script = "wget -qO- https://raw.githubusercontent.com/wade0317/Xray/main/install.sh | bash"
         command_response = ecs_manager.run_command(instance_id, shell_script, timeout=600)
         if not command_response:
             SQLOG.error("❌ 执行安装脚本失败!")
