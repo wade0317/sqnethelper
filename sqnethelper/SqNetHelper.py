@@ -403,6 +403,20 @@ class SqNetHelper:
     
 
     @staticmethod
+    def install_vpn_unified(config, instance_id):
+        SQLOG.info(f"正在安装 VPN...")
+        ecs_manager = ECSManager(config.access_key, config.access_secret, config.region)
+        shell_script = "bash <(wget -qO- https://raw.githubusercontent.com/wade0317/Xray/main/install.sh)"
+        command_response = ecs_manager.run_command(instance_id, shell_script, timeout=600)
+        if not command_response:
+            SQLOG.error("❌ 执行安装脚本失败!")
+            return
+        invoke_id = command_response['InvokeId']
+        res_details = ecs_manager.describe_invocation_results(instance_id, invoke_id, 120, 5)
+        res_info = ecs_manager.base64_decode(res_details.get("Output", ""))
+        SQLOG.info(res_info)
+
+    @staticmethod
     def install_ipsec_vpn(config, instance_id):
         SQLOG.info(f"正在安装 ipsec vpn ...")
         ecs_manager = ECSManager(config.access_key, config.access_secret, config.region)

@@ -379,41 +379,7 @@ def addvpn(verbose):
             return False
         else:
             instance_id = instance_array[vm_choice - 1]['InstanceId']
-            
-            # 显示VPN类型选择菜单
-            SQLOG.great("📡 请选择要安装的VPN类型:")
-            SQLOG.info("1. IPsec VPN (传统VPN，兼容性好)")
-            SQLOG.info("2. Xray - TCP协议 (高性能代理)")
-            SQLOG.info("3. Xray - Reality协议 (抗检测)")
-            # SQLOG.info("4. SingBox - Shadowsocks (轻量级)")
-            # SQLOG.info("5. SingBox - Reality协议 (新一代)")
-            
-            vpn_choice = click.prompt("请选择VPN类型 (1-5)", type=int)
-            
-            if vpn_choice == 1:
-                SQLOG.info("🔧 正在安装 IPsec VPN...")
-                SqNetHelper.install_ipsec_vpn(config, instance_id)
-            elif vpn_choice == 2:
-                port = click.prompt(f"请输入端口号 (默认: {config.xray_tcp_port})", type=int, default=config.xray_tcp_port)
-                SQLOG.info(f"🔧 正在安装 Xray TCP协议，端口: {port}...")
-                SqNetHelper.install_xray_protocol(config, instance_id, 'tcp', port)
-            elif vpn_choice == 3:
-                port = click.prompt(f"请输入端口号 (默认: {config.xray_reality_port})", type=int, default=config.xray_reality_port)
-                SQLOG.info(f"🔧 正在安装 Xray Reality协议，端口: {port}...")
-                SqNetHelper.install_xray_protocol(config, instance_id, 'reality', port)
-            # elif vpn_choice == 4:
-            #     port = click.prompt(f"请输入端口号 (默认: {config.singbox_ss_port})", type=int, default=config.singbox_ss_port)
-            #     SQLOG.info(f"🔧 正在安装 SingBox Shadowsocks协议，端口: {port}...")
-            #     SqNetHelper.install_singbox_protocol(config, instance_id, 'ss', port)
-            # elif vpn_choice == 5:
-            #     port = click.prompt(f"请输入端口号 (默认: {config.singbox_reality_port})", type=int, default=config.singbox_reality_port)
-            #     SQLOG.info(f"🔧 正在安装 SingBox Reality协议，端口: {port}...")
-            #     SqNetHelper.install_singbox_protocol(config, instance_id, 'reality', port)
-            else:
-                SQLOG.error("错误: 无效的VPN类型选择!")
-                return False
-                
-            SQLOG.great("✅ VPN安装完成！请查看上方输出的连接信息和二维码。")
+            SqNetHelper.install_vpn_unified(config, instance_id)
             
 
                 

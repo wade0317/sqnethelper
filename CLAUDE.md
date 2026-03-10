@@ -78,26 +78,32 @@ python -m twine upload dist/*
 
 ### 配置信息
 
-`ConfigManager.py`中的默认配置：
-- 实例类型：`ecs.t6-c2m1.large` (2核CPU, 0.5GB内存) - 可在配置区域时选择
+`ConfigManager.py`中的默认配置（实际值）：
+- 实例类型：`ecs.t6-c4m1.large` (4核CPU, 1GB内存)
 - 默认区域：`cn-hangzhou`
-- 系统镜像：`debian_12_6_x64_20G_alibase_20240711.vhd` - 可在配置区域时选择
-- 磁盘：20GB高效云盘
-- VPN端口：Xray TCP (3000)、Reality (443)、SingBox SS (80)
-- 自动释放：创建后1小时
+- 系统镜像：`debian_12_6_x64_20G_alibase_20240711.vhd`
+- 磁盘：20GB高效云盘（`cloud_efficiency`）
+- 带宽：出网40Mbps（`PayByTraffic`），入网200Mbps
+- VPN端口：Xray TCP (3000)、Reality (443)、SingBox SS (8080)
 - 默认登录：root/Root1234
+- 配置文件：`~/.sqnethelper/config.json`
 
 ### VPN协议支持
 
+`addvpn` 命令当前支持：
 - **IPSec VPN** - 传统VPN，兼容性好
 - **Xray TCP/Reality** - 高性能代理协议
-- **SingBox** - 现代代理，支持配置生成 (sing-box_template.json)
+- SingBox 协议（SS/Reality）代码已实现但在 `addvpn` 命令中被注释掉
+
+### 单例模式注意
+
+`ConfigManager` 和 `SqLog` 均使用单例模式。测试时若需重置 `ConfigManager`，需手动设置 `ConfigManager._instance = None`。全局日志实例为 `SQLOG`（从 `SqLog.py` 导入）。
 
 ## 开发说明
 
-- 使用阿里云Python SDK进行ECS/VPC操作
+- 使用阿里云Python SDK（`aliyun-python-sdk-*`）进行ECS/VPC操作
 - 通过paramiko进行SSH操作以远程安装VPN
 - 配置以JSON格式持久化在用户主目录
 - 使用Click框架构建交互式CLI
 - 所有实例自动标记以便管理和清理
-- 资源文件通过resources.py管理，支持多种加载策略
+- `resources.py` 管理 `sing-box_template.json` 的加载，按优先级尝试 `importlib.resources` → `pkg_resources` → 相对路径
