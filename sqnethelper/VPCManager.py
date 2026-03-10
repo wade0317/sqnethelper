@@ -605,7 +605,10 @@ class VPCManager:
 
         if not self.is_security_group_accept_rule_exist(security_group_id, 'TCP', '80/80'):
             self.add_security_group_accept_rule(security_group_id, 'TCP', '80/80')
-            
+
+        if not self.is_security_group_accept_rule_exist(security_group_id, 'TCP', '2096/2096'):
+            self.add_security_group_accept_rule(security_group_id, 'TCP', '2096/2096')
+
         # VPN端口规则（从配置中读取）
         if config:
             vpn_ports = [
