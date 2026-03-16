@@ -18,10 +18,13 @@ pip install sqnethelper
 # 1. 配置阿里云凭证
 sqnethelper setup
 
-# 2. 一键创建VPN服务器（1小时后自动销毁）
+# 2. 配置VPS区域（可选，列出所有可用区域并交互选择）
+sqnethelper config --region
+
+# 3. 一键创建VPN服务器（1小时后自动销毁）
 sqnethelper create
 
-# 3. 查看实例
+# 4. 查看实例
 sqnethelper list
 ```
 
